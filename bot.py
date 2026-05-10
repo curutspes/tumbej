@@ -1,6 +1,6 @@
 import logging
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, CallbackQueryHandler,
     MessageHandler, ContextTypes, filters, ConversationHandler
@@ -9,7 +9,7 @@ from telegram.ext import (
 # =====================
 # KONFIGURASI - EDIT BAGIAN INI
 # =====================
-BOT_TOKEN = "8604337777:AAEqNVWXUMFe600t201DDkJZaV3FT_SUUpM"       # Token dari BotFather
+BOT_TOKEN = "ISI_TOKEN_BOT_KAMU"       # Token dari BotFather
 ADMIN_USERNAME = "clintgg"              # Username Telegram kamu (tanpa @)
 ADMIN_CHAT_ID = None                    # Akan diisi otomatis saat kamu /start
 
@@ -33,6 +33,28 @@ pesanan_aktif = {}
 
 logging.basicConfig(level=logging.INFO)
 
+BANNER = (
+    "╔══════════════════════╗\n"
+    "║   🎵 ZHANG TIKTOKER  ║\n"
+    "║   Toko Akun Digital  ║\n"
+    "╚══════════════════════╝\n\n"
+    "👋 Selamat datang!\n"
+    "Kami menyediakan akun digital\n"
+    "berkualitas dengan harga terjangkau.\n\n"
+    "⚡ Proses cepat & aman\n"
+    "💳 Bayar via QRIS / GoPay / OVO\n\n"
+    "Pilih menu di bawah untuk mulai:"
+)
+
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("🛒 Pesan Sekarang")],
+        [KeyboardButton("❓ Bantuan")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False
+)
+
 # =====================
 # /start
 # =====================
@@ -48,6 +70,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
+    await update.message.reply_text(BANNER, reply_markup=MAIN_KEYBOARD)
+    return ConversationHandler.END
+
+# =====================
+# TOMBOL PESAN SEKARANG
+# =====================
+async def pesan_sekarang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for key, produk in PRODUCTS.items():
         keyboard.append([InlineKeyboardButton(
@@ -57,10 +86,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Selamat datang! 🛒\nSilakan pilih produk yang kamu inginkan:",
-        reply_markup=reply_markup
+        "🛍️ *Pilih produk yang kamu inginkan:*",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
     )
     return PILIH_PRODUK
+
+# =====================
+# TOMBOL BANTUAN
+# =====================
+async def bantuan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "❓ *Bantuan*\n\n"
+        "Cara pesan:\n"
+        "1️⃣ Tap *Pesan Sekarang*\n"
+        "2️⃣ Pilih produk & kuantiti\n"
+        "3️⃣ Bayar via QRIS\n"
+        "4️⃣ Kirim bukti bayar\n"
+        "5️⃣ Produk langsung dikirim!\n\n"
+        "Ada pertanyaan lain? Hubungi admin: @clintgg",
+        parse_mode="Markdown"
+    )
+    return ConversationHandler.END
 
 # =====================
 # PILIH PRODUK
@@ -140,7 +187,7 @@ async def pilih_kuantiti(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Produk: {produk['name']}\n"
             f"Kuantiti: {qty}\n"
             f"Total: Rp {total:,}\n\n"
-            f"💳 Bayar via QRIS ke nomor admin.\n\n"
+            f"💳 Bayar via QRIS ke admin.\n\n"
             f"Setelah bayar, kirim *screenshot bukti pembayaran* ke sini ya!",
             parse_mode="Markdown"
         )
@@ -155,7 +202,7 @@ async def terima_bukti(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pesanan = pesanan_aktif.get(user.id)
 
     if not pesanan:
-        await update.message.reply_text("Silakan mulai pesanan dulu dengan /start")
+        await update.message.reply_text("Silakan mulai pesanan dulu dengan menekan tombol 🛒 Pesan Sekarang")
         return ConversationHandler.END
 
     await update.message.reply_text(
@@ -237,7 +284,7 @@ async def konfirmasi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # CANCEL
 # =====================
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Pesanan dibatalkan. Ketik /start untuk mulai lagi.")
+    await update.message.reply_text("Pesanan dibatalkan. Tap 🛒 Pesan Sekarang untuk mulai lagi.")
     return ConversationHandler.END
 
 # =====================
@@ -247,7 +294,9 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            MessageHandler(filters.Regex("^🛒 Pesan Sekarang$"), pesan_sekarang),
+        ],
         states={
             PILIH_PRODUK: [CallbackQueryHandler(pilih_produk, pattern="^pilih_")],
             PILIH_KUANTITI: [CallbackQueryHandler(pilih_kuantiti, pattern="^qty_")],
@@ -256,9 +305,10 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)]
     )
 
-    app.add_handler(conv_handler)
-    app.add_handler(CommandHandler("konfirmasi", konfirmasi))
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(conv_handler)
+    app.add_handler(MessageHandler(filters.Regex("^❓ Bantuan$"), bantuan))
+    app.add_handler(CommandHandler("konfirmasi", konfirmasi))
 
     print("Bot berjalan...")
     app.run_polling()
